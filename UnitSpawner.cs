@@ -2,7 +2,6 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
-using Unity.Collections;
 using UnityEngine;
 
 public class UnitSpawner
@@ -13,14 +12,15 @@ public class UnitSpawner
     private Material unitMaterial;
 
     private const float UNIT_SCALE = 0.5f;
-    private const int GROUP_SIZE = 200;
-    private const int GROUP_WIDTH = 8;
-    private const int GROUP_LENGTH = 25;
+    private const int UNITS_WIDE = 8;
+    private const int UNITS_LONG = 25;
     private const float UNIT_SPACING = 0.5f;
     private const float GROUP_SPACING = 1f;
+    private const float GROUP_SIZE_X = ( UNIT_SCALE + UNIT_SPACING ) * UNITS_WIDE;
+    private const float GROUP_SIZE_Z = ( UNIT_SCALE + UNIT_SPACING ) * UNITS_LONG;
 
-    private int frame = 0;
-    private int numFrames = 5;
+    private int frameCount = 0;
+    private int numFrames = 2;
 
     public UnitSpawner( Mesh mesh , Material material )
     {
@@ -34,61 +34,67 @@ public class UnitSpawner
 
     private void CreateUnits()
     {
-        float3 groupPosition = new float3( GROUP_SPACING , 1 , GROUP_SPACING );
-        float groupSizeX = 1; //UNIT_SCALE * GROUP_WIDTH;
-        float groupSizeY = 1; // UNIT_SCALE * GROUP_LENGTH;
+        int size = 2;
 
-        for ( int i = 0; i < 1; i++ )
+        CreateArmy( new POS2D( 10 , 10 ) , size , size );
+        CreateArmy( new POS2D( 1000 , 10 ) , size , size );
+        CreateArmy( new POS2D( 10 , 1000 ) , size , size );
+        CreateArmy( new POS2D( 1000 , 1000 ) , size , size );
+    }
+    private void CreateArmy( POS2D pos , int sizeX , int sizeZ )
+    {
+        for ( int z = 0; z < sizeZ; z++ )
         {
-            groupPosition = new float3( GROUP_SPACING , 1 , groupPosition.z + groupSizeY * i + GROUP_SPACING );
-            for ( int j = 0; j < 2; j++ )
+            POS2D groupPos = new POS2D( pos.x , pos.z + GROUP_SIZE_Z * z + GROUP_SPACING );
+
+            for ( int x = 0; x < sizeX; x++ )
             {
-                CreateGroup( groupPosition );
-                groupPosition = new float3( groupPosition.x + groupSizeX * j + GROUP_SPACING , 1 , groupPosition.z );
+                groupPos = new POS2D( groupPos.x + GROUP_SIZE_X * x + GROUP_SPACING , groupPos.z );
+                CreateGroup( groupPos );
             }
         }
     }
-
-    private void CreateGroup( float3 startPosition )
+    private void CreateGroup( POS2D startPos2D )
     {
-        for ( int i = 0; i < GROUP_LENGTH; i++ )
+        for ( int z = 0; z < UNITS_LONG; z++ )
         {
-            for ( int j = 0; j < GROUP_WIDTH; j++ )
+            for ( int x = 0; x < UNITS_WIDE; x++ )
             {
-                float x = startPosition.x + j * ( UNIT_SCALE + UNIT_SPACING );
-                float y = startPosition.z + i * ( UNIT_SCALE + UNIT_SPACING );
-                float3 unitPosition = new float3( x , 1 , y );
+                float xPos = startPos2D.x + x * ( UNIT_SCALE + UNIT_SPACING );
+                float zPos = startPos2D.z + z * ( UNIT_SCALE + UNIT_SPACING );
+                POS2D unitPosition = new POS2D( xPos , zPos );
 
                 CreateUnit( unitPosition );
             }
         }
     }
-
-    private void CreateUnit( float3 position )
+    private void CreateUnit( POS2D pos2D )
     {
         Entity unit = entityManager.CreateEntity(
             typeof( UnitTag ) ,
 
+            // Render
             typeof( RenderMesh ) ,
             typeof( RenderBounds ) ,
             typeof( LocalToWorld ) ,
             typeof( Translation ) ,
             typeof( Rotation ) ,
             typeof( Scale ) ,
+            // Physics
             typeof( Velocity ) ,
             typeof( Mass ) ,
-            typeof( MapKey ) ,
+            // Other
+            typeof( CollisionCell ) ,
             typeof( TargetPosition ) ,
             typeof( MoveSpeed ) ,
-            typeof( CollisionMapKey ) ,
-            typeof( TIndex ) );
+            typeof( FrameIndex ) );
 
         entityManager.SetComponentData( unit , new Velocity { Value = float3.zero } );
         entityManager.SetComponentData( unit , new Mass { Value = 1f } );
         entityManager.SetComponentData( unit , new TargetPosition { Value = new float3( UnityEngine.Random.Range(5, 100) , 1 , UnityEngine.Random.Range( 5 , 100 ) ) } );
         entityManager.SetComponentData( unit , new MoveSpeed { Walk = 0.4f , Run = 0.8f } );
 
-        entityManager.SetSharedComponentData( unit , new TIndex { Value = frame } );
+        entityManager.SetSharedComponentData( unit , new FrameIndex { Value = frameCount } );
 
         entityManager.SetSharedComponentData( unit , new RenderMesh
         {
@@ -96,77 +102,24 @@ public class UnitSpawner
             material = unitMaterial
         } );
 
-        entityManager.SetComponentData( unit , new Translation { Value = position } );
+        entityManager.SetComponentData( unit , new Translation { Value = new float3( pos2D.x , 1 , pos2D.z ) } );
         entityManager.SetComponentData( unit , new Scale { Value = UNIT_SCALE } );
 
-        frame++;
-
-        if ( frame > numFrames )
-        {
-            frame = 0;
-        }
+        if ( frameCount < numFrames )
+            frameCount++;
+        else
+            frameCount = 0;
     }
 
-    /*private void CreateUnit2( float3 position )
+    private struct POS2D
     {
-        BlobAssetReference<Unity.Physics.Collider> spCollider = Unity.Physics.CapsuleCollider.Create( new CapsuleGeometry { } );
-        Entity unit = CreateBody( entityManager , unitMesh , position , quaternion.identity , spCollider , float3.zero , float3.zero , 1 , true );
+        public float x;
+        public float z;
 
-        PhysicsGravityFactor gravity = new PhysicsGravityFactor
+        public POS2D( float _x , float _z )
         {
-            Value = 0 ,
-        };
-        entityManager.AddComponentData<PhysicsGravityFactor>( unit , gravity );
+            x = _x;
+            z = _z;
+        }
     }
-
-    public unsafe Entity CreateBody(
-    EntityManager entityManager ,
-    RenderMesh displayMesh , float3 position , quaternion orientation , BlobAssetReference<Collider> collider ,
-    float3 linearVelocity , float3 angularVelocity , float mass , bool isDynamic
-    )
-    {
-        ComponentType[] componentTypes = new ComponentType[ isDynamic ? 9 : 6 ];
-
-        componentTypes[ 0 ] = typeof( RenderMesh );
-        componentTypes[ 1 ] = typeof( RenderBounds );
-        componentTypes[ 2 ] = typeof( Translation );
-        componentTypes[ 3 ] = typeof( Rotation );
-        componentTypes[ 4 ] = typeof( LocalToWorld );
-        componentTypes[ 5 ] = typeof( PhysicsCollider );
-        if ( isDynamic )
-        {
-            componentTypes[ 6 ] = typeof( PhysicsVelocity );
-            componentTypes[ 7 ] = typeof( PhysicsMass );
-            componentTypes[ 8 ] = typeof( PhysicsDamping );
-        }
-        Entity entity = entityManager.CreateEntity( componentTypes );
-
-        entityManager.SetSharedComponentData( entity , displayMesh );
-        entityManager.SetComponentData( entity , new RenderBounds { Value = displayMesh.mesh.bounds.ToAABB() } );
-
-        entityManager.SetComponentData( entity , new Translation { Value = position } );
-        entityManager.SetComponentData( entity , new Rotation { Value = orientation } );
-
-        entityManager.SetComponentData( entity , new PhysicsCollider { Value = collider } );
-
-        if ( isDynamic )
-        {
-            Collider* colliderPtr = ( Collider* ) collider.GetUnsafePtr();
-            entityManager.SetComponentData( entity , PhysicsMass.CreateDynamic( colliderPtr->MassProperties , mass ) );
-            // Calculate the angular velocity in local space from rotation and world angular velocity
-            float3 angularVelocityLocal = math.mul( math.inverse( colliderPtr->MassProperties.MassDistribution.Transform.rot ) , angularVelocity );
-            entityManager.SetComponentData( entity , new PhysicsVelocity()
-            {
-                Linear = linearVelocity ,
-                Angular = angularVelocityLocal
-            } );
-            entityManager.SetComponentData( entity , new PhysicsDamping()
-            {
-                Linear = 0.01f ,
-                Angular = 0.05f
-            } );
-        }
-
-        return entity;
-    }*/
 }

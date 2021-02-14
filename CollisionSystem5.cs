@@ -30,14 +30,14 @@ public class CollisionSystem5 : SystemBase
         [ReadOnly] public int CELLS_ACROSS;
 
         [ReadOnly] public ComponentTypeHandle<Translation> translationHandle;
-        public ComponentTypeHandle<MapKey> mapKeyHandle;
+        public ComponentTypeHandle<CollisionCell> mapKeyHandle;
 
         [BurstCompile]
         public unsafe void Execute( ArchetypeChunk batchInChunk , int batchIndex )
         {
             // 16b rn -> xp 2b xp 2b xv 0.5b yv 0.5b m 2b state 1b
             NativeArray<Translation> batchTranslation = batchInChunk.GetNativeArray( translationHandle );
-            NativeArray<MapKey> batchMapKey = batchInChunk.GetNativeArray( mapKeyHandle );
+            NativeArray<CollisionCell> batchMapKey = batchInChunk.GetNativeArray( mapKeyHandle );
 
             // This loop can be unrolled
             for ( int i = 0; i < batchInChunk.Count; i++ )
@@ -50,7 +50,7 @@ public class CollisionSystem5 : SystemBase
                 //var p = ( int* ) &cellHash;
                 //int v = (int) Hash( p , 10 );
 
-                batchMapKey[ i ] = new MapKey { Value = 5 }; //new MapKey { Value = v % 4000 };
+                batchMapKey[ i ] = new CollisionCell { Value = 5 }; //new MapKey { Value = v % 4000 };
             }
 
             // simd this
@@ -80,7 +80,7 @@ public class CollisionSystem5 : SystemBase
         [ReadOnly] public ComponentTypeHandle<Translation> translationHandle;
         [ReadOnly] public ComponentTypeHandle<Velocity> velocityHandle;
         [ReadOnly] public ComponentTypeHandle<Mass> massHandle;
-        public ComponentTypeHandle<MapKey> mapKeyHandle;
+        public ComponentTypeHandle<CollisionCell> mapKeyHandle;
 
         [BurstCompile]
         public unsafe void Execute( ArchetypeChunk batchInChunk , int batchIndex )
@@ -89,7 +89,7 @@ public class CollisionSystem5 : SystemBase
             NativeArray<Translation> batchTranslation = batchInChunk.GetNativeArray( translationHandle );
             NativeArray<Velocity> batchVelocity = batchInChunk.GetNativeArray( velocityHandle );
             NativeArray<Mass> batchMass = batchInChunk.GetNativeArray( massHandle );
-            NativeArray<MapKey> batchMapKey = batchInChunk.GetNativeArray( mapKeyHandle );
+            NativeArray<CollisionCell> batchMapKey = batchInChunk.GetNativeArray( mapKeyHandle );
 
             // This loop can be unrolled
             for ( int i = 0; i < batchInChunk.Count; i++ )
@@ -102,7 +102,7 @@ public class CollisionSystem5 : SystemBase
                 //var p = ( int* ) &cellHash;
                 //int v = (int) Hash( p , 10 );
 
-                batchMapKey[ i ] = new MapKey { Value = 5 }; //new MapKey { Value = v % 4000 };
+                batchMapKey[ i ] = new CollisionCell { Value = 5 }; //new MapKey { Value = v % 4000 };
             }
 
             // simd this
@@ -130,12 +130,12 @@ public class CollisionSystem5 : SystemBase
         [ReadOnly] public int CELLS_ACROSS;
         [ReadOnly] public int CELLS_PER_THREAD;
 
-        [ReadOnly] public ComponentTypeHandle<MapKey> mapKeyHandle;
+        [ReadOnly] public ComponentTypeHandle<CollisionCell> mapKeyHandle;
 
         [BurstCompile]
         public unsafe void Execute( ArchetypeChunk batchInChunk , int batchIndex , int indexOfFirstEntityInQuery )
         {
-            NativeArray<MapKey> batchMapKey = batchInChunk.GetNativeArray( mapKeyHandle );
+            NativeArray<CollisionCell> batchMapKey = batchInChunk.GetNativeArray( mapKeyHandle );
             int scd = 5;
 
             // This loop can be unrolled
