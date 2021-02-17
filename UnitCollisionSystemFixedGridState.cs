@@ -20,7 +20,7 @@ public class UnitCollisionSystemFixedGridState : SystemBase
     protected override void OnStartRunning()
     {
         base.OnStartRunning();
-        grid = new NativeArray<ushort>( 36000000 , Allocator.Persistent );
+        /*grid = new NativeArray<ushort>( 36000000 , Allocator.Persistent );
         copyCellData = new NativeQueue<CopyCellData>( Allocator.Persistent );
         generalQuery = GetEntityQuery( typeof( Translation ) );
 
@@ -35,11 +35,11 @@ public class UnitCollisionSystemFixedGridState : SystemBase
             grid = grid
         };
 
-        Dependency = initJob.Schedule( generalQuery , Dependency );
+        Dependency = initJob.Schedule( generalQuery , Dependency );*/
     }
     protected override void OnUpdate()
     {
-        generalQuery = GetEntityQuery( typeof( Translation ) );
+        /*generalQuery = GetEntityQuery( typeof( Translation ) );
         NativeArray<CopyUnitData> copyArray = new NativeArray<CopyUnitData>( generalQuery.CalculateEntityCount() , Allocator.TempJob );
 
         UpdateCellsJob updateCellsJob = new UpdateCellsJob
@@ -69,7 +69,7 @@ public class UnitCollisionSystemFixedGridState : SystemBase
             copyArray = copyArray
         };
 
-        JobHandle broadphaseBarrier = JobHandle.CombineDependencies( 
+        JobHandle broadphaseBarrier = JobHandle.CombineDependencies(
             broadPhaseJob.Schedule( Dependency ) ,
             copyJob.ScheduleParallel( generalQuery , 1 , Dependency ) );
         broadphaseBarrier.Complete();
@@ -98,12 +98,12 @@ public class UnitCollisionSystemFixedGridState : SystemBase
         JobHandle writeBarrier = writeJob.ScheduleParallel( generalQuery , 1 , narrowphaseBarrier );
         writeBarrier.Complete();
         copyCellData.Clear();
-        Dependency = copyArray.Dispose( writeBarrier );
+        Dependency = copyArray.Dispose( writeBarrier );*/
     }
     protected override void OnDestroy()
     {
-        grid.Dispose();
-        copyCellData.Dispose();
+        /*grid.Dispose();
+        copyCellData.Dispose();*/
         base.OnDestroy();
     }
 
@@ -200,7 +200,7 @@ public class UnitCollisionSystemFixedGridState : SystemBase
                 int unitID = data.unitID;
                 int count = 0;
 
-                while ( count < 4 )
+                while ( count < CELL_CAPACITY )
                 {
                     if ( grid[ gridIndex + count ] == unitID )
                     {
@@ -214,7 +214,7 @@ public class UnitCollisionSystemFixedGridState : SystemBase
                 count = 0;
                 gridIndex = data.newCell * CELL_CAPACITY;
 
-                while ( count < 4 )
+                while ( count < CELL_CAPACITY )
                 {
                     if ( grid[ gridIndex + count ] == VOID_CELL_VALUE )
                     {
@@ -268,79 +268,72 @@ public class UnitCollisionSystemFixedGridState : SystemBase
         public void Execute( int i )
         {
             float px = copyUnitData[ i ].position.x;
-            float py = copyUnitData[ i ].position.z;
+            float pz = copyUnitData[ i ].position.z;
             float vx = copyUnitData[ i ].velocity.x;
-            float vy = copyUnitData[ i ].velocity.z;
+            float vz = copyUnitData[ i ].velocity.z;
             float m = copyUnitData[ i ].mass;
 
-            float adjustmentPX = px;
-            float adjustmentPY = py;
-            float adjustmentVX = vx;
-            float adjustmentVY = vy;
-
-            int curCell = ( int ) ( math.floor( px / CELL_SIZE ) + math.floor( py / CELL_SIZE ) * CELLS_ACROSS );
-            //int xNei = ( int ) ( math.sign( math.round( px ) - px ) );
-            //int yNei = ( int ) ( math.sign( math.round( py ) - py ) );
+            int curCell = ( int ) ( math.floor( px / CELL_SIZE ) + math.floor( pz / CELL_SIZE ) * CELLS_ACROSS );
             int xR = ( int ) math.round( px );
-            int yR = ( int ) math.round( py );
+            int yR = ( int ) math.round( pz );
             int xD = math.select( 1 , -1 , xR < px );
-            int yD = math.select( 1 , -1 , yR < py );
+            int yD = math.select( 1 , -1 , yR < pz );
 
-            Cells cells = new Cells();
-            cells.cell = curCell;
-            /*cells.xN = cells.cell + xNei;
-            cells.yN = cells.cell + yNei * CELLS_ACROSS;
-            cells.cN = curCell + xNei + yNei * CELLS_ACROSS;*/
-            cells.xN = cells.cell + xD;
-            cells.yN = cells.cell + yD * CELLS_ACROSS;
-            cells.cN = curCell + xD + yD * CELLS_ACROSS;
+            Cells cells = new Cells()
+            {
+                cell = curCell ,
+                xN = curCell + xD ,
+                yN = curCell + yD * CELLS_ACROSS ,
+                cN = curCell + xD + yD * CELLS_ACROSS
+            };
 
             var p = ( int* ) &cells;
             var length = 4;
-            //UnsafeUtility.SizeOf<Cells>() / UnsafeUtility.SizeOf<int>();
 
             for ( int j = 0; j < length; j++ )
             {
                 int gridIndex = p[ j ] * CELL_CAPACITY;
                 int count = 0;
-                while ( count < 4 )
+                while ( count < CELL_CAPACITY )
                 {
                     int otherUnitIndex = grid[ gridIndex ];
                     float px2 = copyUnitData[ otherUnitIndex ].position.x;
-                    float py2 = copyUnitData[ otherUnitIndex ].position.z;
+                    float pz2 = copyUnitData[ otherUnitIndex ].position.z;
                     float vx2 = copyUnitData[ otherUnitIndex ].velocity.x;
-                    float vy2 = copyUnitData[ otherUnitIndex ].velocity.z;
+                    float vz2 = copyUnitData[ otherUnitIndex ].velocity.z;
                     float m2 = copyUnitData[ otherUnitIndex ].mass;
 
-                    float distance = math.sqrt( ( px - px2 ) * ( px - px2 ) + ( py - py2 ) * ( py - py2 ) );
+                    float distance = math.sqrt( ( px - px2 ) * ( px - px2 ) + ( pz - pz2 ) * ( pz - pz2 ) );
                     int overlaps = math.select( 0 , 1 , distance < RADIUS );
 
                     float overlap = 0.5f * ( distance - RADIUS );
 
-                    adjustmentPX -= overlaps * ( overlap * ( px - px2 ) ) / ( distance + 0.01f );
-                    adjustmentPY -= overlaps * ( overlap * ( py - py2 ) ) / ( distance + 0.01f );
+                    float ax = overlaps * ( overlap * ( px - px2 ) ) / ( distance + 0.01f );
+                    float az = overlaps * ( overlap * ( pz - pz2 ) ) / ( distance + 0.01f );
 
-                    adjustmentVX = adjustmentVX; //+ vx2 * m2;
-                    adjustmentVY = adjustmentVY; // + vx2 * m2;
+                    float ax1 = px - ax;
+                    float az1 = pz - az;
+                    float ax2 = px2 + ax;
+                    float az2 = pz2 + az;
+
+                    copyUnitData[ i ] = new CopyUnitData
+                    {
+                        position = new float3( ax1 , copyUnitData[ i ].position.y , az1 ) ,
+                        velocity = new float3( pz , copyUnitData[ i ].velocity.y , pz ) ,
+                        mass = copyUnitData[ i ].mass
+                    };
+
+                    copyUnitData[ otherUnitIndex ] = new CopyUnitData
+                    {
+                        position = new float3( ax2 , copyUnitData[ i ].position.y , az2 ) ,
+                        velocity = new float3( vx2 , copyUnitData[ i ].velocity.y , vz2 ) ,
+                        mass = copyUnitData[ i ].mass
+                    };
 
                     gridIndex++;
                     count++;
                 }
             }
-
-            copyUnitData[ i ] = new CopyUnitData
-            {
-                position = new float3( adjustmentPX , copyUnitData[ i ].position.y , adjustmentPY ) ,
-                velocity = new float3( adjustmentVX , copyUnitData[ i ].velocity.y , adjustmentVY ) ,
-                mass = copyUnitData[ i ].mass
-            };
-
-            /*copyUnitData[ i ] = new CopyUnitData
-            {
-                position = copyUnitData[ i ].position ,
-                velocity = copyUnitData[ i ].velocity ,
-                mass = copyUnitData[ i ].mass
-            };*/
         }
     }
     private struct WriteDataJob : IJobEntityBatchWithIndex
@@ -394,13 +387,3 @@ public class UnitCollisionSystemFixedGridState : SystemBase
         public float4 mass;
     }
 }
-
-// Copy data to vectorized array, array is sorted by entity index
-// Parralel write vectors to map
-// Parallel resolve
-// Parallel write back
-
-// To parallel write to the grid where theres more than 1 slot
-// Divide entities by number of available threads with SharedComponentData
-// Then, assign one slot of each bucket of 4 to one on the threads
-// This way each thread will have their own memory slot to write to
